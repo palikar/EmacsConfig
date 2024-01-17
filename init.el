@@ -8,13 +8,18 @@
 ;; Global variables
 (defvar config-directory (file-name-directory user-init-file))
 
-(add-to-list ' custom-theme-load-path (concat config-directory "lisp"))
+(add-to-list 'custom-theme-load-path (concat config-directory "lisp"))
 (add-to-list 'load-path (concat config-directory "lisp"))
+
+;; (require ' smooth-scroll)
 
 (require 'hlsl-mode)
 (require 'glsl-mode)
-
+(require 'scroll-on-jump)
+(require 'pixel-scroll)
+(require 'dumb-jump)
 (require 'zygospore)
+(require 'ag)
 (require 'ibuffer-vc)
 (require 'typit)
 (require 'git-timemachine)
@@ -39,7 +44,10 @@
 (require 'aggressive-indent)
 (require 'vsexp)
 (require 'projectile)
+(require 'helm-core)
+(require 'helm-semantic)
 (require 'helm)
+(require 'helm-lib)
 (require 'helm-config)
 (require 'ibuffer)
 (require 'imenu-list)
@@ -50,12 +58,12 @@
 (require 'gtags)
 (require 'helm-projectile)
 (require 'helm-ag)
-;; (require 'org-bullets)
 (require 'drag-stuff)
 (require 'ox-gfm)
 (require 'anzu)
 (require 'visible-mark)
 
+;; (require 'org-bullets)
 (global-visible-mark-mode 't)
 
 (anzu-mode 't)
@@ -119,12 +127,10 @@
 (defun smarter-move-beginning-of-line (arg)
   (interactive "^p")
   (setq arg (or arg 1))
-
   ;; Move lines first
   (when (/= arg 1)
     (let ((line-move-visual nil))
       (forward-line (1- arg))))
-
   (let ((orig-point (point)))
     (back-to-indentation)
     (when (= orig-point (point))
@@ -210,18 +216,54 @@ an error."
   (delete-pair)
   (backward-char 1))
 
+(defun open-dot-compile-file ()
+  (interactive)
+  (find-file (concat (file-name-as-directory (projectile-project-root)) ".compile")))
+
+(defun joe/smooth-scroll-half-page-down ()
+  "Smooth scroll down"
+  (interactive)
+  (let ((half-height (/ (window-height) 2)))
+    (pixel-scroll-precision-interpolate (* 5 (- half-height)))))
+
+(defun joe/smooth-scroll-half-page-up ()
+  "Smooth scroll down"
+  (interactive)
+  (let ((half-height (/ (window-height) 2)))
+    (pixel-scroll-precision-interpolate (* 5 half-height))))
+
+(defun joe/smooth-scroll-line-up ()
+  "Smooth scroll down"
+  (interactive)
+  (let ((half-height 4))
+    (pixel-scroll-precision-interpolate (* 5 half-height))))
+
+(defun joe/smooth-scroll-line-down()
+  "Smooth scroll down"
+  (interactive)
+  (let ((half-height 4))
+    (pixel-scroll-precision-interpolate (* 5 (- half-height)))))
+
+(add-hook 'hlsl-mode-hook
+	  (lambda ()
+	    (setq tab-width 4)
+	    (setq indent-tabs-mode t)
+	    ))
+
 (add-to-list 'auto-mode-alist '("\\.inc\\'" . c++-mode))
+(add-to-list 'auto-mode-alist '("\\.h\\'" . c++-mode))
 (add-to-list 'auto-mode-alist '("\\.hlsl\\'" . hlsl-mode))
 (add-to-list 'auto-mode-alist '("\\.ihlsl\\'" . hlsl-mode))
 (add-to-list 'auto-mode-alist '("\\.el\\'" . emacs-lisp-mode))
 (add-to-list 'auto-mode-alist '("\\.md\\'" . markdown-mode))
+;; (add-to-list 'auto-mode-alist '("\\.text\\'" . markdown-mode))
+;; (add-to-list 'auto-mode-alist '("\\.txt\\'" . markdown-mode))
 (add-to-list 'auto-mode-alist '("\\.markdown\\'" . markdown-mode))
-(add-to-list 'auto-mode-alist '("\\.text\\'" . markdown-mode))
-(add-to-list 'auto-mode-alist '("\\.txt\\'" . markdown-mode))
 (add-to-list 'auto-mode-alist '("README\\.md\\'" . gfm-mode))
 (add-to-list 'auto-mode-alist '("CMakeLists.txt\\'" . cmake-mode))
 (add-to-list 'auto-mode-alist '("\\.cmake\\'" . cmake-mode))
 (add-to-list 'auto-mode-alist '("\\.html\\'" . web-mode))
+(add-to-list 'auto-mode-alist '("\\.bui\\'" . web-mode))
 (add-to-list 'auto-mode-alist '("\\.tpl\\.php\\'" . web-mode))
 (add-to-list 'auto-mode-alist '("\\.[agj]sp\\'" . web-mode))
 (add-to-list 'auto-mode-alist '("\\.as[cp]x\\'" . web-mode))
@@ -243,7 +285,31 @@ an error."
 (global-unset-key  ( kbd "C-<home>"))
 (global-unset-key  ( kbd "C-<end>"))
 
-(bind-key* "C-c m" 'global-visible-mark-mode)
+;; (setq scroll-on-jump-duration 0.2)
+;; (setq scroll-on-jump-smooth 't)
+;; (setq scroll-on-jump-curve 'smooth)
+
+;; (scroll-on-jump-advice-add rsmooth-scroll)
+;; (scroll-on-jump-advice-add undo)
+;; (scroll-on-jump-advice-add pop-global-mark)
+;; (scroll-on-jump-advice-add isearch-search)
+;; (scroll-on-jump-advice-add helm-semantic-or-imenu)
+
+;; (scroll-on-jump-advice-remove previous-line)
+;; (scroll-on-jump-advice-remove next-line)
+;; (scroll-on-jump-advice-remove forward-paragraph)
+;; (scroll-on-jump-advice-remove backward-paragraph)
+
+;; (global-set-key (kbd "C-l") (scroll-on-jump-interactive 'recenter))
+;; (bind-key* "C-l" (scroll-on-jump-interactive 'recenter))
+
+(bind-key* "<f12>" 'dumb-jump-go)
+
+(bind-key* "C-x p" 'previous-buffer)
+
+;; (bind-key* "C-x n" 'next-buffer)
+
+(bind-key* "C-c	 m" 'global-visible-mark-mode)
 
 (bind-key* "C-TAB" 'self-insert-command)
 
@@ -279,17 +345,9 @@ an error."
 
 (bind-key* "<f5>" 'revert-buffer)
 
-(bind-key* "C-<prior>" 'scroll-down-line)
+(bind-key* "C-<prior>" 'scroll-down-line)3
 
 (bind-key* "C-<next>" 'scroll-up-line)
-
-(bind-key* "C-S-<prior>" 'scroll-down-line)
-
-(bind-key* "C-S-<next>" 'scroll-up-line)
-
-(bind-key* "C-M-<prior>" 'scroll-down)
-
-(bind-key* "C-M-<next>" 'scroll-up)
 
 (bind-key* "C-c d" 'delete-file)
 
@@ -345,7 +403,11 @@ an error."
 
 (bind-key* "C-c <down>"  'windmove-down)
 
+(setq aw-ignore-current t)
+
 (bind-key* "C-x o" 'ace-window)
+
+(bind-key* "C-x M-o" 'other-frame)
 
 (bind-key* "C-c o" 'crux-open-with)
 
@@ -354,6 +416,8 @@ an error."
 (bind-key* "C-c i" 'find-myinit-file)
 
 (bind-key* "C-c I" 'crux-find-user-init-file)
+
+(bind-key* "C-c c" 'open-dot-compile-file)
 
 (bind-key* "C-c 1" 'crux-create-scratch-buffer)
 
@@ -455,9 +519,6 @@ an error."
 
 (global-set-key (kbd "C-x 1") 'zygospore-toggle-delete-other-windows)
 
-
-
-
 (setq inhibit-startup-message t)
 (setq frame-title-format '("Emacs " emacs-version))
 (setq cursor-type 'box)
@@ -477,6 +538,8 @@ an error."
 (face-spec-set 'secondary-selection '((t (:background "light sky blue" :foreground "black"))))
 
 
+(menu-bar-mode -1) ;; not menu bar please!
+
 ;; Behaviour tweaks
 (drag-stuff-global-mode)
 (setq indent-tabs-mode nil)
@@ -494,9 +557,11 @@ an error."
 (global-syntax-subword-mode 1) ;; easy workings with camel case, snake case and pretty much anything else
 (global-auto-revert-mode 1) ;; see changes on disc as quick as possible
 (prefer-coding-system 'utf-8)
-(set-default-coding-systems 'utf-8)
-(set-terminal-coding-system 'utf-8)
-(set-keyboard-coding-system 'utf-8)
+(set-default-coding-systems 'utf-8-dos)
+(set-terminal-coding-system 'utf-8-dos)
+(set-keyboard-coding-system 'utf-8-dos)
+(setq-default buffer-file-coding-system 'utf-8-dos)
+(set-buffer-file-coding-system 'dos)
 (put 'upcase-region 'disabled nil)
 (put 'downcase-region 'disabled nil)
 (setq tab-always-indent 'complete)
@@ -622,7 +687,7 @@ an error."
   (c-set-offset 'case-label '*)
   (c-set-offset 'access-label '/)
   (c-set-offset 'inlambda 0)
-  (c-set-offset 'arglist-cont-nonempty ''c-lineup-arglist)
+  (c-set-offset 'arglist-cont-nonempty '++)
   (c-set-offset 'lambda-intro-cont 0)
   (c-set-offset 'brace-list-open 0)
   (c-set-offset 'brace-list-close 0)
@@ -719,9 +784,11 @@ an error."
 
 (setq helm-exit-idle-delay 0)
 (setq helm-ag-fuzzy-match t)
+(setq helm-ag-command-option "--cpp -U")
 
 (setq helm-autoresize-max-height 0)
 (setq helm-autoresize-min-height 50)
+(setq helm-buffer-max-length 50)
 
 (helm-mode 1)
 
@@ -1018,6 +1085,8 @@ an error."
 
 (bind-key* "C-c p C" 'recompile)
 
+(bind-key* "C-c l" 'ov-clear)
+
 (defun my-compile (action)
   (setq compile-command action)
   (setq compilation-read-command 'nil)
@@ -1038,6 +1107,10 @@ an error."
 			     ("Edit and Compile" . my-edit-compile)))
 	:buffer "*helm compile*")
   (cd current-dir))
+
+(defun close-compile-buffer ()
+  (interactive)
+  (delete-window (get-buffer-window "*compilation*")))
 
 (defun find-file-at-point-goto-line (ret)
   "Ignore RET and jump to line number given in `ffap-string-at-point'."
@@ -1101,7 +1174,7 @@ an error."
 (modify-face 'font-lock-study-face "Yellow" nil nil t nil t nil nil)
 (modify-face 'font-lock-important-face "Yellow" nil nil t nil t nil nil)
 (modify-face 'font-lock-note-face "Dark Green" nil nil t nil t nil nil)
- 
+
 
 (require 'custom)
 (require 'ov)
@@ -1125,12 +1198,12 @@ an error."
   (setq error-line-overlay (make-overlay 1 1))
   (setq whole-line-overlay (make-overlay 1 1))
 
-  (setq all-overlays (cons whole-line-overlay all-overlays)) 
-  (setq all-overlays (cons error-line-overlay all-overlays)) 
+  (setq all-overlays (cons whole-line-overlay all-overlays))
+  (setq all-overlays (cons error-line-overlay all-overlays))
 
   (setq face-color (if err "#8b0000" "#8b4500"))
   (setq msg s)
-  
+
   (overlay-put error-line-overlay
 	       'face `(:background ,face-color))
 
@@ -1180,8 +1253,40 @@ an error."
 	  (setq compile-message (buffer-substring beg end)))
 	(highlight-current-line compile-message err)))
     (error nil))
-  (first-error))
+  (condition-case nil
+      (first-error)
+    (error nil)))
 
 (add-to-list 'compilation-finish-functions 'highlight-error-lines)
 (add-hook 'compilation-start-hook '(lambda (proc) (ov-clear)))
 ;; (setq compilation-finish-function 'highlight-error-lines)
+
+(add-hook 'write-file-hooks 'delete-trailing-whitespace nil t)
+
+
+;; (setq compilation-finish-functions nil)
+;; (setq compilation-start-hook nil)
+
+
+(setq pixel-scroll-precision-mode 't)
+(setq mouse-wheel-scroll-amount '(1 ((shift) . 1))) ;; one line at a time
+(setq mouse-wheel-progressive-speed nil) ;; don't accelerate scrolling
+(setq mouse-wheel-follow-mouse 't) ;; scroll window under mouse
+(setq scroll-step 5) ;; keyboard scroll one line at a time
+
+
+(defun ag-in-current-dir (string)
+  (interactive (list (ag/read-from-minibuffer "Search string")))
+  (ag/search string default-directory))
+
+(defun my-random-sort-lines (beg end)
+  "Sort lines in region randomly."
+  (interactive "r")
+  (save-excursion
+    (save-restriction
+      (narrow-to-region beg end)
+      (goto-char (point-min))
+      (let ;; To make `end-of-line' and etc. to ignore fields.
+          ((inhibit-field-text-motion t))
+        (sort-subr nil 'forward-line 'end-of-line nil nil
+                   (lambda (s1 s2) (eq (random 2) 0)))))))

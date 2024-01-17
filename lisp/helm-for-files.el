@@ -1,6 +1,6 @@
 ;;; helm-for-files.el --- helm-for-files and related. -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012 ~ 2019 Thierry Volpiatto <thierry.volpiatto@gmail.com>
+;; Copyright (C) 2012 ~ 2023 Thierry Volpiatto 
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -128,7 +128,7 @@ Be aware that a nil value will make tramp display very slow."
    (migemo :initform t)
    (persistent-action :initform 'helm-ff-kill-or-find-buffer-fname)))
 
-(defmethod helm--setup-source :after ((source helm-recentf-source))
+(cl-defmethod helm--setup-source :after ((source helm-recentf-source))
   (setf (slot-value source 'action)
         (append (symbol-value (helm-actions-from-type-file))
                 '(("Delete file(s) from recentf" .
@@ -150,7 +150,7 @@ small.")
          (let ((helm-fuzzy-sort-fn 'helm-fuzzy-matching-sort-fn-preserve-ties-order))
            (setq helm-source-recentf
                  (helm-make-source "Recentf" 'helm-recentf-source
-                   :fuzzy-match helm-recentf-fuzzy-match)))))
+                   :fuzzy-match val)))))
 
 
 ;;; Files in current dir
@@ -164,7 +164,7 @@ Colorize only symlinks, directories and files."
                             'identity)
            for i in files
            for disp = (if (and helm-ff-transformer-show-only-basename
-                               (not (helm-dir-is-dot i))
+                               (not (helm-ff-dot-file-p i))
                                (not (and helm--url-regexp
                                          (string-match helm--url-regexp i)))
                                (not (string-match helm-ff-url-regexp i)))
@@ -174,7 +174,7 @@ Colorize only symlinks, directories and files."
            ;; Call file-attributes only if:
            ;; - file is not remote
            ;; - helm-for-files--tramp-not-fancy is nil and file is remote AND
-           ;; connected. (Issue #1679)
+           ;; connected. (Bug#1679)
            for type = (and (or (null isremote)
                                (and (null helm-for-files-tramp-not-fancy)
                                     (file-remote-p i nil t)))
@@ -193,11 +193,18 @@ Colorize only symlinks, directories and files."
                                     'match-part (funcall mp-fn disp)
                                     'help-echo (expand-file-name i))
                         i))
-                 (t (cons (propertize disp
-                                      'face 'helm-ff-file
-                                      'match-part (funcall mp-fn disp)
-                                      'help-echo (expand-file-name i))
-                          i)))))
+                 (t (let* ((ext (helm-file-name-extension disp))
+                           (disp (propertize disp
+                                             'face 'helm-ff-file
+                                             'match-part (funcall mp-fn disp)
+                                             'help-echo (expand-file-name i))))
+                      (when (condition-case _err
+                                (string-match (format "\\.\\(%s\\)$" ext) disp)
+                              (invalid-regexp nil))
+                        (add-face-text-property
+                         (match-beginning 1) (match-end 1)
+                         'helm-ff-file-extension nil disp))
+                      (cons disp i))))))
 
 (defclass helm-files-in-current-dir-source (helm-source-sync helm-type-file)
   ((candidates :initform (lambda ()
@@ -299,11 +306,5 @@ searching for is already found."
         :buffer "*helm recentf*"))
 
 (provide 'helm-for-files)
-
-;; Local Variables:
-;; byte-compile-warnings: (not obsolete)
-;; coding: utf-8
-;; indent-tabs-mode: nil
-;; End:
 
 ;;; helm-for-files.el ends here

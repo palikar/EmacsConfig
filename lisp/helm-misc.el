@@ -1,6 +1,6 @@
 ;;; helm-misc.el --- Various functions for helm -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012 ~ 2019 Thierry Volpiatto <thierry.volpiatto@gmail.com>
+;; Copyright (C) 2012 ~ 2023 Thierry Volpiatto 
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -198,12 +198,74 @@ It is added to `extended-command-history'.
     map))
 
 (defcustom helm-minibuffer-history-must-match t
-  "Allow inserting non matching elements when nil or 'confirm."
+  "Allow inserting non matching elements when nil or \\='confirm."
   :group 'helm-misc
   :type '(choice
           (const :tag "Must match" t)
-          (const :tag "Confirm" 'confirm)
+          (const :tag "Confirm" confirm)
           (const :tag "Always allow" nil)))
+
+(defcustom helm-minibuffer-history-key "C-r"
+  "The key `helm-minibuffer-history' is bound to in minibuffer local maps."
+  :type '(choice (string :tag "Key") (const :tag "no binding"))
+  :group 'helm-mode)
+
+(defconst helm-minibuffer-history-old-key
+  (cl-loop for map in '(minibuffer-local-completion-map
+                        minibuffer-local-filename-completion-map
+                        minibuffer-local-filename-must-match-map ; Emacs 23.1.+
+                        minibuffer-local-isearch-map
+                        minibuffer-local-map
+                        minibuffer-local-must-match-filename-map ; Older Emacsen
+                        minibuffer-local-must-match-map
+                        minibuffer-local-ns-map)
+           when (and (boundp map) (symbol-value map))
+           collect (cons map (lookup-key (symbol-value map) "\C-r"))))
+
+;;;###autoload
+(define-minor-mode helm-minibuffer-history-mode
+    "Bind `helm-minibuffer-history-key' in al minibuffer maps.
+This mode is enabled by `helm-mode', so there is no need to enable it directly."
+  :group 'helm-misc
+  :global t
+  (if helm-minibuffer-history-mode
+      (let ((key helm-minibuffer-history-key))
+        (dolist (map '(minibuffer-local-completion-map
+                          minibuffer-local-filename-completion-map
+                          minibuffer-local-filename-must-match-map ; Emacs 23.1.+
+                          minibuffer-local-isearch-map
+                          minibuffer-local-map
+                          minibuffer-local-must-match-filename-map ; Older Emacsen
+                          minibuffer-local-must-match-map
+                          minibuffer-local-ns-map))
+          (let ((vmap (and (boundp map) (symbol-value map))))
+            (when (keymapp vmap)
+              (let ((val (and (boundp 'helm-minibuffer-history-key)
+                              (symbol-value 'helm-minibuffer-history-key))))
+                (when val
+                  (define-key vmap
+                      (if (stringp val) (read-kbd-macro val) val)
+                    nil)))
+              (when key
+                (define-key (symbol-value map)
+                    (if (stringp key) (read-kbd-macro key) key)
+                  'helm-minibuffer-history))))))
+    (dolist (map '(minibuffer-local-completion-map
+                      minibuffer-local-filename-completion-map
+                      minibuffer-local-filename-must-match-map
+                      minibuffer-local-isearch-map
+                      minibuffer-local-map
+                      minibuffer-local-must-match-filename-map
+                      minibuffer-local-must-match-map
+                      minibuffer-local-ns-map))
+      (let ((vmap (and (boundp map) (symbol-value map))))
+        (when (keymapp vmap)
+          (let ((val (and (boundp 'helm-minibuffer-history-key)
+                          (symbol-value 'helm-minibuffer-history-key))))
+            (when val
+              (define-key vmap
+                (if (stringp val) (read-kbd-macro val) val)
+                (assoc-default map helm-minibuffer-history-old-key)))))))))
 
 
 ;;; Helm ratpoison UI
@@ -314,7 +376,7 @@ Default action change TZ environment variable locally to emacs."
                               :multiline t
                               :keymap helm-minibuffer-history-map
                               :allow-nest t)))
-    ;; Fix issue #1667 with emacs-25+ `query-replace-from-to-separator'.
+    ;; Fix Bug#1667 with emacs-25+ `query-replace-from-to-separator'.
     (when (and (boundp 'query-replace-from-to-separator) query-replace-p)
       (let ((pos (string-match "\0" elm)))
         (and pos
@@ -324,203 +386,8 @@ Default action change TZ environment variable locally to emacs."
               elm))))
     (delete-minibuffer-contents)
     (insert elm)))
-
-;;; GPG keys
-;;
-;;
-(eval-when-compile (require 'epg))
-(defvar epa-protocol)
-(defvar epa-last-coding-system-specified)
-(defvar epg-key-validity-alist)
-(defvar mail-header-separator)
-(declare-function epg-list-keys             "epg")
-(declare-function epg-make-context          "epg")
-(declare-function epg-key-sub-key-list      "epg")
-(declare-function epg-sub-key-id            "epg")
-(declare-function epg-key-user-id-list      "epg")
-(declare-function epg-user-id-string        "epg")
-(declare-function epg-user-id-validity      "epg")
-(declare-function epa-sign-region           "epa")
-(declare-function epa--read-signature-type  "epa")
-(declare-function epa-display-error         "epa")
-(declare-function epg-export-keys-to-string "epg")
-(declare-function epg-context-armor         "epg")
-(declare-function epg-context-set-armor     "epg")
 
-(defvar helm-epa--list-only-secrets nil
-  "[INTERNAL] Used to pass MODE argument to `epg-list-keys'.")
-
-(defcustom helm-epa-actions '(("Show key" . epa--show-key)
-                              ("encrypt file with key" . helm-epa-encrypt-file)
-                              ("Copy keys to kill ring" . helm-epa-kill-keys-armor))
-  "Actions for `helm-epa-list-keys'."
-  :type '(alist :key-type string :value-type symbol)
-  :group 'helm-misc)
-
-(defclass helm-epa (helm-source-sync)
-  ((init :initform (lambda ()
-                     (require 'epg)
-                     (require 'epa)))
-   (candidates :initform 'helm-epa-get-key-list))
-  "Allow building helm sources for GPG keys.")
-
-(defun helm-epa-get-key-list ()
-  "Build candidate list for `helm-epa-list-keys'."
-  (cl-loop with all-keys = (epg-list-keys (epg-make-context epa-protocol)
-                                          nil helm-epa--list-only-secrets)
-           for key in all-keys
-           for sublist = (car (epg-key-sub-key-list key))
-           for subkey-id = (epg-sub-key-id sublist)
-           for uid-list = (epg-key-user-id-list key)
-           for uid = (epg-user-id-string (car uid-list))
-           for validity = (epg-user-id-validity (car uid-list))
-           collect (cons (format " %s %s %s"
-                                 (helm-aif (rassq validity epg-key-validity-alist)
-                                     (string (car it))
-                                   "?")
-                                 (propertize
-                                  subkey-id
-                                  'face (cl-case validity
-                                          (none 'epa-validity-medium)
-                                          ((revoked expired)
-                                           'epa-validity-disabled)
-                                          (t 'epa-validity-high)))
-                                 (propertize
-                                  uid 'face 'font-lock-warning-face))
-                         key)))
-
-(defun helm-epa-select-keys (_context prompt &optional names secret)
-  "A helm replacement for `epa-select-keys'."
-  (let ((helm-epa--list-only-secrets secret))
-    (helm :sources (helm-make-source "Epa select keys" 'helm-epa)
-          :default (if (stringp names) names (regexp-opt names))
-          :prompt (and prompt (helm-epa--format-prompt prompt))
-          :buffer "*helm epa*")))
-
-(defun helm-epa--format-prompt (prompt)
-  (let ((split (split-string prompt "\n")))
-    (if (cdr split)
-        (format "%s\n(%s): "
-                (replace-regexp-in-string "\\.[\t ]*\\'" "" (car split))
-                (replace-regexp-in-string "\\.[\t ]*\\'" "" (cadr split)))
-      (format "%s: " (replace-regexp-in-string "\\.[\t ]*\\'" "" (car split))))))
-
-(defun helm-epa--read-signature-type ()
-  "A helm replacement for `epa--read-signature-type'."
-  (let ((answer (helm-read-answer "Signature type:
-(n - Create a normal signature)
-(c - Create a cleartext signature)
-(d - Create a detached signature)"
-                                  '("n" "c" "d"))))
-    (helm-acase answer
-      ("n" 'normal)
-      ("c" 'clear)
-      ("d" 'detached))))
-
-;;;###autoload
-(define-minor-mode helm-epa-mode
-  "Enable helm completion on gpg keys in epa functions."
-  :group 'helm-misc
-  :global t
-  (require 'epa)
-  (if helm-epa-mode
-      (progn
-        (advice-add 'epa-select-keys :override #'helm-epa-select-keys)
-        (advice-add 'epa--read-signature-type :override #'helm-epa--read-signature-type))
-    (advice-remove 'epa-select-keys #'helm-epa-select-keys)
-    (advice-remove 'epa--read-signature-type #'helm-epa--read-signature-type)))
-
-(defun helm-epa-action-transformer (actions _candidate)
-  "Helm epa action transformer function."
-  (cond ((with-helm-current-buffer
-           (derived-mode-p 'message-mode 'mail-mode))
-         (helm-append-at-nth
-          actions '(("Sign mail with key" . helm-epa-mail-sign)
-                    ("Encrypt mail with key" . helm-epa-mail-encrypt))
-          3))
-        (t actions)))
-
-(defun helm-epa-encrypt-file (candidate)
-  "Select a file to encrypt with key CANDIDATE."
-  (let ((file (helm-read-file-name "Encrypt file: "))
-        (key (epg-sub-key-id (car (epg-key-sub-key-list candidate))))
-        (id  (epg-user-id-string (car (epg-key-user-id-list candidate)))))
-    (epa-encrypt-file file candidate)
-    (message "File encrypted with key `%s %s'" key id)))
-
-(defun helm-epa-kill-keys-armor (_candidate)
-  "Copy marked keys to kill ring."
-  (let ((keys (helm-marked-candidates))
-        (context (epg-make-context epa-protocol)))
-    (with-no-warnings
-      (setf (epg-context-armor context) t))
-    (condition-case error
-	(kill-new (epg-export-keys-to-string context keys))
-      (error
-       (epa-display-error context)
-       (signal (car error) (cdr error))))))
-
-(defun helm-epa-mail-sign (candidate)
-  "Sign email with key CANDIDATE."
-  (let ((key (epg-sub-key-id (car (epg-key-sub-key-list candidate))))
-        (id  (epg-user-id-string (car (epg-key-user-id-list candidate))))
-        start end mode)
-    (save-excursion
-      (goto-char (point-min))
-      (if (search-forward mail-header-separator nil t)
-	  (forward-line))
-      (setq epa-last-coding-system-specified
-	    (or coding-system-for-write
-	        (select-safe-coding-system (point) (point-max))))
-      (let ((verbose current-prefix-arg))
-        (setq start (point)
-              end (point-max)
-              mode (if verbose
-		       (epa--read-signature-type)
-	             'clear))))
-    ;; TODO Make non-interactive functions to replace epa-sign-region
-    ;; and epa-encrypt-region and inline them.
-    (with-no-warnings
-      (epa-sign-region start end candidate mode))
-    (message "Mail signed with key `%s %s'" key id)))
-
-(defun helm-epa-mail-encrypt (candidate)
-  "Encrypt email with key CANDIDATE."
-  (let (start end)
-    (save-excursion
-      (goto-char (point-min))
-      (when (search-forward mail-header-separator nil t)
-	(forward-line))
-      (setq start (point)
-            end (point-max))
-      (setq epa-last-coding-system-specified
-	    (or coding-system-for-write
-		(select-safe-coding-system start end))))
-    ;; Don't let some read-only text stop us from encrypting.
-    (let ((inhibit-read-only t)
-          (key (epg-sub-key-id (car (epg-key-sub-key-list candidate))))
-          (id  (epg-user-id-string (car (epg-key-user-id-list candidate)))))
-      (with-no-warnings
-        (epa-encrypt-region start end candidate nil nil))
-      (message "Mail encrypted with key `%s %s'" key id))))
-
-;;;###autoload
-(defun helm-epa-list-keys ()
-  "List all gpg keys.
-This is the helm interface for `epa-list-keys'."
-  (interactive)
-  (helm :sources
-        (helm-make-source "Epg list keys" 'helm-epa
-          :action-transformer 'helm-epa-action-transformer
-          :action 'helm-epa-actions)
-        :buffer "*helm epg list keys*"))
 
 (provide 'helm-misc)
-
-;; Local Variables:
-;; byte-compile-warnings: (not obsolete)
-;; coding: utf-8
-;; indent-tabs-mode: nil
-;; End:
 
 ;;; helm-misc.el ends here

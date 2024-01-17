@@ -1,6 +1,6 @@
 ;;; helm-id-utils.el --- Helm interface for id-utils. -*- lexical-binding: t -*-
 
-;; Copyright (C) 2015 ~ 2019 Thierry Volpiatto <thierry.volpiatto@gmail.com>
+;; Copyright (C) 2015 ~ 2020 Thierry Volpiatto 
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -67,7 +67,7 @@ MacPorts to install id-utils, it should be `gid32'."
                                                0))
                                   'face 'helm-locate-finish))))
                   (force-mode-line-update))
-                (helm-log "Error: Gid %s"
+                (helm-log "helm-gid-candidates-process" "Error: Gid %s"
                           (replace-regexp-in-string "\n" "" event))))))))
 
 (defun helm-gid-filtered-candidate-transformer (candidates _source)
@@ -79,7 +79,7 @@ MacPorts to install id-utils, it should be `gid32'."
   ((header-name
     :initform
     (lambda (name)
-      (concat name " [" (helm-attr 'db-dir) "]")))
+      (concat name " [" (helm-get-attr 'db-dir) "]")))
    (db-dir :initarg :db-dir
            :initform nil
            :custom string
@@ -121,11 +121,5 @@ See <https://www.gnu.org/software/idutils/>."
           :truncate-lines helm-grep-truncate-lines)))
 
 (provide 'helm-id-utils)
-
-;; Local Variables:
-;; byte-compile-warnings: (not obsolete)
-;; coding: utf-8
-;; indent-tabs-mode: nil
-;; End:
 
 ;;; helm-id-utils ends here

@@ -1,6 +1,6 @@
 ;;; helm-font --- Font and ucs selection for Helm -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012 ~ 2019 Thierry Volpiatto <thierry.volpiatto@gmail.com>
+;; Copyright (C) 2012 ~ 2023 Thierry Volpiatto 
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -21,6 +21,9 @@
 (require 'helm)
 (require 'helm-help)
 
+;; No warnings in Emacs built --without-x
+(declare-function x-list-fonts "xfaces.c")
+
 (declare-function helm-generic-sort-fn "helm-utils")
 
 (defgroup helm-font nil
@@ -38,7 +41,8 @@
     ("Insert character code in hex" . helm-ucs-insert-code)
     ("Kill marked characters"       . helm-ucs-kill-char)
     ("Kill name"                    . helm-ucs-kill-name)
-    ("Kill code"                    . helm-ucs-kill-code))
+    ("Kill code"                    . helm-ucs-kill-code)
+    ("Describe char"                . helm-ucs-describe-char))
   "Actions for `helm-source-ucs'."
   :group 'helm-font
   :type '(alist :key-type string :value-type function))
@@ -238,6 +242,13 @@ name."
   (helm-ucs-save-recentest candidate)
   (kill-new (helm-ucs-match candidate 3)))
 
+;; Describe char
+(defun helm-ucs-describe-char (candidate)
+  "Describe char CANDIDATE."
+  (with-temp-buffer
+    (insert (helm-ucs-match candidate 2))
+    (describe-char (point-min))))
+
 ;; Navigation in current-buffer (persistent)
 
 (defun helm-ucs-forward-char (_candidate)
@@ -259,33 +270,33 @@ name."
 (defun helm-ucs-persistent-forward ()
   (interactive)
   (with-helm-alive-p
-    (helm-attrset 'action-forward 'helm-ucs-forward-char)
+    (helm-set-attr 'action-forward 'helm-ucs-forward-char)
     (helm-execute-persistent-action 'action-forward)))
 (put 'helm-ucs-persistent-forward 'helm-only t)
 
 (defun helm-ucs-persistent-backward ()
   (interactive)
   (with-helm-alive-p
-    (helm-attrset 'action-back 'helm-ucs-backward-char)
+    (helm-set-attr 'action-back 'helm-ucs-backward-char)
     (helm-execute-persistent-action 'action-back)))
 (put 'helm-ucs-persistent-backward 'helm-only t)
 
 (defun helm-ucs-persistent-delete ()
   (interactive)
   (with-helm-alive-p
-    (helm-attrset 'action-delete 'helm-ucs-delete-backward)
+    (helm-set-attr 'action-delete 'helm-ucs-delete-backward)
     (helm-execute-persistent-action 'action-delete)))
 (put 'helm-ucs-persistent-delete 'helm-only t)
 
 (defun helm-ucs-persistent-insert-space ()
   (interactive)
   (with-helm-alive-p
-    (helm-attrset 'action-insert-space 'helm-ucs-insert-space)
+    (helm-set-attr 'action-insert-space 'helm-ucs-insert-space)
     (helm-execute-persistent-action 'action-insert-space)))
 
 (defvar helm-source-ucs-recent
   (helm-build-sync-source "Recent UCS"
-    :action helm-ucs-actions
+    :action 'helm-ucs-actions
     :candidates (lambda () helm-ucs-recent)
     :help-message helm-ucs-help-message
     :keymap helm-ucs-map
@@ -298,7 +309,7 @@ name."
     :help-message 'helm-ucs-help-message
     :filtered-candidate-transformer
     (lambda (candidates _source) (sort candidates #'helm-generic-sort-fn))
-    :action helm-ucs-actions
+    :action 'helm-ucs-actions
     :persistent-action (lambda (candidate)
                          (helm-ucs-insert-char candidate)
                          (helm-force-update))
@@ -329,11 +340,5 @@ Called with a prefix arg force reloading cache."
           :buffer "*helm ucs*")))
 
 (provide 'helm-font)
-
-;; Local Variables:
-;; byte-compile-warnings: (not obsolete)
-;; coding: utf-8
-;; indent-tabs-mode: nil
-;; End:
 
 ;;; helm-font.el ends here
