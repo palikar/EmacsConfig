@@ -1,4 +1,4 @@
-;;; magit.el --- A Git porcelain inside Emacs  -*- lexical-binding: t; coding: utf-8 -*-
+;;; Magit.el --- A Git porcelain inside Emacs  -*- lexical-binding: t; coding: utf-8 -*-
 
 ;; Copyright (C) 2008-2018  The Magit Project Contributors
 ;;

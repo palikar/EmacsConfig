@@ -5,6 +5,7 @@
 (setq vc-follow-symlinks t)
 (setq debug-on-error 't)
 
+
 ;; Global variables
 (defvar config-directory (file-name-directory user-init-file))
 
@@ -13,6 +14,7 @@
 
 ;; (require ' smooth-scroll)
 
+(require 'lua-mode)
 (require 'hlsl-mode)
 (require 'glsl-mode)
 (require 'scroll-on-jump)
@@ -250,6 +252,7 @@ an error."
 	    (setq indent-tabs-mode t)
 	    ))
 
+(add-to-list 'auto-mode-alist '("\\.inl\\'" . c++-mode))
 (add-to-list 'auto-mode-alist '("\\.inc\\'" . c++-mode))
 (add-to-list 'auto-mode-alist '("\\.h\\'" . c++-mode))
 (add-to-list 'auto-mode-alist '("\\.hlsl\\'" . hlsl-mode))
@@ -1290,3 +1293,11 @@ an error."
           ((inhibit-field-text-motion t))
         (sort-subr nil 'forward-line 'end-of-line nil nil
                    (lambda (s1 s2) (eq (random 2) 0)))))))
+
+
+(defun ag-in-current-dir (string)
+  (interactive (list (ag/read-from-minibuffer "Search string")))
+  (ag/search string default-directory))
+
+(setq native-comp-always-compile 't)
+(setq native-comp-jit-compilation 't)
