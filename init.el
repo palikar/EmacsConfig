@@ -14,6 +14,10 @@
 
 ;; (require ' smooth-scroll)
 
+(require 'beancount)
+(require 'fasm-mode)
+(require 'go-mode)
+(require 'yaml-mode)
 (require 'lua-mode)
 (require 'hlsl-mode)
 (require 'glsl-mode)
@@ -277,7 +281,7 @@ an error."
 (add-to-list 'auto-mode-alist '("/some/react/path/.*\\.js[x]?\\'" . web-mode))
 (add-to-list 'auto-mode-alist '("\\.html?\\'" . web-mode))
 (add-to-list 'auto-mode-alist '("\\.mm\\'" . objc-mode))
-
+(add-to-list 'auto-mode-alist '("\\.beancount\\'" . beancount-mode))
 
 (global-unset-key  ( kbd "<prior>"))
 (global-unset-key  ( kbd "<next>"))
@@ -287,6 +291,13 @@ an error."
 (global-unset-key  ( kbd "<insert>"))
 (global-unset-key  ( kbd "C-<home>"))
 (global-unset-key  ( kbd "C-<end>"))
+
+(global-unset-key  ( kbd "C-x C-l"))
+
+(add-hook 'beancount-mode-hook
+	  (lambda () (setq-local electric-indent-chars nil)))
+
+(add-hook 'beancount-mode-hook #'outline-minor-mode)
 
 ;; (setq scroll-on-jump-duration 0.2)
 ;; (setq scroll-on-jump-smooth 't)
@@ -545,7 +556,6 @@ an error."
 
 ;; Behaviour tweaks
 (drag-stuff-global-mode)
-(setq indent-tabs-mode nil)
 (setq auto-save-default nil)
 (setq backup-inhibited t)
 (setq mouse-wheel-scroll-amount '(1 ((shift) . 1)))
@@ -567,11 +577,13 @@ an error."
 (set-buffer-file-coding-system 'dos)
 (put 'upcase-region 'disabled nil)
 (put 'downcase-region 'disabled nil)
-(setq tab-always-indent 'complete)
 (setq require-final-newline t)
 (setq mouse-yank-at-point t)
 (setq create-lockfiles nil)
 (auto-compression-mode t)
+
+(setq tab-always-indent 'complete)
+(setq tab-always-indent 'nil)
 
 (volatile-highlights-mode t)
 
@@ -625,7 +637,6 @@ an error."
 (setq custom-enabled-themes (quote (spacemacs-dark)))
 (setq custom-safe-themes t)
 (load-theme 'spacemacs-dark)
-
 
 (global-hungry-delete-mode)
 
@@ -704,7 +715,6 @@ an error."
 (add-hook 'cmake-mode-hook 'cmake-font-lock-activate)
 
 (setq cmake-tab-width 4)
-
 
 
 (defun my-web-mode-hook ()
@@ -787,7 +797,7 @@ an error."
 
 (setq helm-exit-idle-delay 0)
 (setq helm-ag-fuzzy-match t)
-(setq helm-ag-command-option "--cpp -U")
+(setq helm-ag-command-option "--cpp -U --cc")
 
 (setq helm-autoresize-max-height 0)
 (setq helm-autoresize-min-height 50)
@@ -901,7 +911,6 @@ an error."
    ((> (buffer-size) 1000) (format "%7.1fk" (/ (buffer-size) 1000.0)))
    (t (format "%8d" (buffer-size)))))
 
-
 (setq ibuffer-formats
       '((mark modified read-only " "
 	      (name 18 18 :left :elide)
@@ -912,17 +921,13 @@ an error."
 	      " "
 	      filename-and-process)))
 
-
 (add-hook 'ibuffer-mode-hook
 	  '(lambda ()
 	     (ibuffer-auto-mode 1)
 	     (ibuffer-switch-to-saved-filter-groups "home")))
 
-
-
 (setq imenu-list-auto-resize t)
 (setq imenu-list-after-jump-hook nil)
-
 
 (setq company-minimum-prefix-length 3
       company-tooltip-align-annotations nil
@@ -933,7 +938,6 @@ an error."
       company-tooltip-maximum-width 100
       company-tooltip-minimum-width 100)
 (global-company-mode t)
-
 
 (define-key company-active-map (kbd "C-n") 'company-select-next-or-abort)
 (define-key company-active-map (kbd "C-p") 'company-select-previous-or-abort)
@@ -954,7 +958,6 @@ an error."
 				 company-dabbrev))
 
 (setq company-backends `(,basic-company-backends))
-
 
 (face-spec-set 'iedit-occurrence '((t (:background "pale green" :foreground "black"))))
 
@@ -1025,7 +1028,6 @@ an error."
 
 (add-hook 'window-setup-hook 'post-load-stuff t)
 
-
 (defun async-shell-command-no-window
     (command)
   (interactive)
@@ -1062,14 +1064,11 @@ an error."
   (interactive)
   (async-shell-command-no-window (format "remedybg.exe run-to-cursor \"%s\" %i " (buffer-file-name) (line-number-at-pos)) ))
 
-
-
 (add-to-list 'compilation-error-regexp-alist 'casey-devenv)
 
 (add-to-list 'compilation-error-regexp-alist-alist '(casey-devenv
 						     "*\\([0-9]+>\\)?\\(\\(?:[a-zA-Z]:\\)?[^:(\t\n]+\\)(\\([0-9]+\\)): \\(?:see declaration\\|\\(?:warnin\\(g\\)\\|[a-z ]+\\) C[0-9]+:\\)"
 						     2 3 nil (4)))
-
 
 (setq-default compilation-error-regexp-alist
 	      (cons '("^\\([0-9]+>\\)?\\(\\(?:[a-zA-Z]:\\)?[^:(\t\n]+\\)(\\([0-9]+\\)) : \\(?:fatal error\\|warnin\\(g\\)\\) C[0-9]+:" 2 3 nil (4))
@@ -1077,10 +1076,7 @@ an error."
 
 (bind-key* "C-x n" 'compilation-next-error 'compilation-mode-map)
 (bind-key* "C-x n" 'next-error)
-
-
 (bind-key* "C-x d" 'open-file-in-remedy)
-
 (bind-key* "<f9>" 'remedy-add-breakpoint)
 (bind-key* "C-c p l" 'remedy-start-debugging)
 (bind-key* "C-c p s" 'remedy-stop-debugging)
@@ -1148,7 +1144,6 @@ an error."
 	:buffer "*helm types*")
   (cd current-dir))
 
-
 (bind-key* "C-c p c" 'helm-compile)
 (bind-key* "C-c p t" 'helm-type)
 
@@ -1177,7 +1172,6 @@ an error."
 (modify-face 'font-lock-study-face "Yellow" nil nil t nil t nil nil)
 (modify-face 'font-lock-important-face "Yellow" nil nil t nil t nil nil)
 (modify-face 'font-lock-note-face "Dark Green" nil nil t nil t nil nil)
-
 
 (require 'custom)
 (require 'ov)
@@ -1264,12 +1258,12 @@ an error."
 (add-hook 'compilation-start-hook '(lambda (proc) (ov-clear)))
 ;; (setq compilation-finish-function 'highlight-error-lines)
 
-(add-hook 'write-file-hooks 'delete-trailing-whitespace nil t)
+(add-hook 'before-save-hook 'delete-trailing-whitespace)
+;; (add-hook 'write-file-hooks 'delete-trailing-whitespace nil t)
 
 
 ;; (setq compilation-finish-functions nil)
 ;; (setq compilation-start-hook nil)
-
 
 (setq pixel-scroll-precision-mode 't)
 (setq mouse-wheel-scroll-amount '(1 ((shift) . 1))) ;; one line at a time
@@ -1299,5 +1293,8 @@ an error."
   (interactive (list (ag/read-from-minibuffer "Search string")))
   (ag/search string default-directory))
 
+
 (setq native-comp-always-compile 't)
 (setq native-comp-jit-compilation 't)
+
+(add-hook 'go-mode-hook (lambda () (setq tab-width 2)))
