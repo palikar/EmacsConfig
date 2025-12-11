@@ -12,7 +12,11 @@
 (add-to-list 'custom-theme-load-path (concat config-directory "lisp"))
 (add-to-list 'load-path (concat config-directory "lisp"))
 
-;; (require ' smooth-scroll)
+;; (require 'smooth-scroll)
+
+;; (require 'astro-ts-mode)
+
+(require 'rust-mode)
 
 (require 'beancount)
 (require 'fasm-mode)
@@ -257,6 +261,7 @@ an error."
 	    ))
 
 (add-to-list 'auto-mode-alist '("\\.inl\\'" . c++-mode))
+(add-to-list 'auto-mode-alist '("\\.svg\\'" . nxml-mode))
 (add-to-list 'auto-mode-alist '("\\.inc\\'" . c++-mode))
 (add-to-list 'auto-mode-alist '("\\.h\\'" . c++-mode))
 (add-to-list 'auto-mode-alist '("\\.hlsl\\'" . hlsl-mode))
@@ -270,6 +275,7 @@ an error."
 (add-to-list 'auto-mode-alist '("CMakeLists.txt\\'" . cmake-mode))
 (add-to-list 'auto-mode-alist '("\\.cmake\\'" . cmake-mode))
 (add-to-list 'auto-mode-alist '("\\.html\\'" . web-mode))
+(add-to-list 'auto-mode-alist '("\\.tmpl\\'" . web-mode))
 (add-to-list 'auto-mode-alist '("\\.bui\\'" . web-mode))
 (add-to-list 'auto-mode-alist '("\\.tpl\\.php\\'" . web-mode))
 (add-to-list 'auto-mode-alist '("\\.[agj]sp\\'" . web-mode))
@@ -282,6 +288,8 @@ an error."
 (add-to-list 'auto-mode-alist '("\\.html?\\'" . web-mode))
 (add-to-list 'auto-mode-alist '("\\.mm\\'" . objc-mode))
 (add-to-list 'auto-mode-alist '("\\.beancount\\'" . beancount-mode))
+(add-to-list 'auto-mode-alist '("\\.rs\\'" . rust-mode))
+(add-to-list 'auto-mode-alist '("\\.astro\\'" . web-mode))
 
 (global-unset-key  ( kbd "<prior>"))
 (global-unset-key  ( kbd "<next>"))
@@ -316,6 +324,8 @@ an error."
 
 ;; (global-set-key (kbd "C-l") (scroll-on-jump-interactive 'recenter))
 ;; (bind-key* "C-l" (scroll-on-jump-interactive 'recenter))
+
+(bind-key* "M-a" 'align-regexp)
 
 (bind-key* "<f12>" 'dumb-jump-go)
 
@@ -721,23 +731,27 @@ an error."
 
   (emmet-mode 1)
 
-  (setq web-mode-markup-indent-offset 2)
-  (setq web-mode-css-indent-offset 2)
-  (setq web-mode-code-indent-offset 2)
+  (setq web-mode-markup-indent-offset 4)
+  (setq web-mode-css-indent-offset 4)
+  (setq web-mode-code-indent-offset 4)
   (setq web-mode-style-padding 1)
   (setq web-mode-script-padding 1)
   (setq web-mode-block-padding 0)
-  (setq web-mode-markup-indent-offset 2)
+  (setq web-mode-markup-indent-offset 4)
+  (setq web-mode-enable-auto-indentation nil)
 
   (setq web-mode-extra-auto-pairs '(("erb"  . (("beg" "end")))
 				    ("php"  . (("beg" "end")
 					       ("beg" "end")))))
 
+  (setq web-mode-enable-current-element-highlight t)
   (setq web-mode-enable-auto-pairing t)
-  (setq web-mode-enable-current-column-highlight t)
+  (setq web-mode-enable-current-column-highlight nil)
 
+  (set-face-background 'web-mode-current-element-highlight-face "Cornsilk")
   (setq web-mode-ac-sources-alist '(("css" . (ac-source-css-property))
 				    ("html" . (ac-source-words-in-buffer ac-source-abbrev)))))
+
 (add-hook 'web-mode-hook  'my-web-mode-hook)
 
 (setq yas-snippet-dirs '())
@@ -797,7 +811,8 @@ an error."
 
 (setq helm-exit-idle-delay 0)
 (setq helm-ag-fuzzy-match t)
-(setq helm-ag-command-option "--cpp -U --cc")
+;; (setq helm-ag-command-option "--cpp -U --cc")
+(setq helm-ag-command-option "")
 
 (setq helm-autoresize-max-height 0)
 (setq helm-autoresize-min-height 50)
@@ -913,7 +928,7 @@ an error."
 
 (setq ibuffer-formats
       '((mark modified read-only " "
-	      (name 18 18 :left :elide)
+	      (name 38 38 :left :elide)
 	      " "
 	      (size-h 9 -1 :right)
 	      " "
@@ -1107,6 +1122,29 @@ an error."
 	:buffer "*helm compile*")
   (cd current-dir))
 
+(defun collect-regex-matches-in-buffer (regex)
+  "Return a list of matches for REGEX in every line of the current buffer."
+  (let ((matches '()))
+    (save-excursion
+      (goto-char (point-min))
+      (while (not (eobp))
+        (let ((line (thing-at-point 'line t))
+	      (pos (point)))
+          (when (string-match regex line)
+	    (let ((display (string-trim-right (string-trim-left line))))
+	      (push (cons display pos) matches))
+            ))
+        (forward-line 1)))
+    (nreverse matches)))
+
+(defun helm-tags()
+  (interactive)
+  (helm :sources (helm-build-sync-source "Tags in File"
+		   :candidates (collect-regex-matches-in-buffer "#\(.*\)")
+		   :action '(("GoTo" . (lambda (line) (goto-char line))))
+		   )
+	:buffer "*helm tags*"))
+
 (defun close-compile-buffer ()
   (interactive)
   (delete-window (get-buffer-window "*compilation*")))
@@ -1139,13 +1177,12 @@ an error."
 		     (concat (file-name-as-directory (projectile-project-root)) ".types")
 		   :action '(("Go to" . my-go-to))
 		   :real-to-display (lambda (line) (string-trim-left (nth 2 (helm-grep-split-line line))))
-		   :get-line #'buffer-substring
-		   )
+		   :get-line #'buffer-substring)
 	:buffer "*helm types*")
   (cd current-dir))
 
 (bind-key* "C-c p c" 'helm-compile)
-(bind-key* "C-c p t" 'helm-type)
+(bind-key* "C-c p t" 'helm-tags)
 
 (setq fixme-modes '(c++-mode c-mode emacs-lisp-mode))
 (make-face 'font-lock-fixme-face)
@@ -1298,3 +1335,5 @@ an error."
 (setq native-comp-jit-compilation 't)
 
 (add-hook 'go-mode-hook (lambda () (setq tab-width 2)))
+
+;; (setq scroll-conservatively 101)
